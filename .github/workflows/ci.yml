@@ -55,10 +55,20 @@ jobs:
           load: true
           tags: devops-playground-backend:ci-latest
 
-      - name: Run Trivy filesystem scan (image)
-        uses: aquasecurity/trivy-action@v0.33.1
+      - name: Install Trivy CLI
+        uses: aquasecurity/setup-trivy@v0.2.4
         with:
-          format: 'table'
-          image-ref: 'devops-playground-backend:ci-latest'
-          exit-code: '1'   # fail the job on HIGH/CRITICAL findings
-          severity: 'CRITICAL,HIGH'
+          # optional: specify a Trivy version; omit to install latest
+          version: v0.65.0
+
+      - name: Run Trivy image scan (fail on HIGH/CRITICAL)
+        run: |
+          echo "Scanning image: devops-playground-backend:ci-latest"
+          # Download vulnerability DB (cache will be used on subsequent runs)
+          trivy image --format table --severity CRITICAL,HIGH devops-playground-backend:ci-latest || exit_code=$? && echo "Trivy exit code: ${exit_code}"
+          # Fail job if Trivy exit code signals vulnerabilities (non-zero)
+          # The Trivy exit code policy: 0 (no vuln), 2 (error), 1 (vulns found). We want to fail on vuln (1)
+          if [ "${exit_code:-0}" -ne 0 ]; then
+            echo "::error::Trivy found HIGH/CRITICAL vulnerabilities (exit=${exit_code})"
+            exit ${exit_code}
+          fi

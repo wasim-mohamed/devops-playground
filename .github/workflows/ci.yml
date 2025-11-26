@@ -28,9 +28,9 @@ jobs:
           pip install pytest
 
       - name: Run pytest
-        working-directory: backend
+        # Run tests from repo root but target backend tests so imports resolve
         run: |
-          pytest -q
+          pytest -q backend/tests
 
   build_and_scan:
     name: Build image and run Trivy scan
@@ -56,7 +56,7 @@ jobs:
           tags: devops-playground-backend:ci-latest
 
       - name: Run Trivy filesystem scan (image)
-        uses: aquasecurity/trivy-action@v1
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           format: 'table'
           image-ref: 'devops-playground-backend:ci-latest'

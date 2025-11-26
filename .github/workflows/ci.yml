@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-    tests:
+  tests:
     name: Run tests
     runs-on: ubuntu-latest
     env:

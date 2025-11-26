@@ -1,7 +1,8 @@
 # backend/tests/test_api.py
 import json
 import pytest
-from app.api import app
+# use a full import path so CI and local runs resolve the module the same
+from backend.app.api import app
 
 @pytest.fixture
 def client():

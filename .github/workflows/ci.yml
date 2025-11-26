@@ -7,9 +7,11 @@ on:
     branches: [ main ]
 
 jobs:
-  tests:
+    tests:
     name: Run tests
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ./backend
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

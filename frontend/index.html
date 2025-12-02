@@ -2,108 +2,127 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>DevOps Playground — Debug UI</title>
-  <!-- Socket.IO client from CDN (v4) -->
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <title>DevOps Playground — Demo UI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 18px; }
-    button { padding: 8px 12px; margin: 8px 0; }
-    #logs { border:1px solid #ccc; padding:10px; height:320px; overflow:auto; white-space:pre-wrap; background:#f9f9f9;}
-    #meta { margin-bottom: 8px; }
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      max-width: 820px;
+      margin: 28px auto;
+      padding: 12px;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 6px 6px 6px 0;
+      cursor: pointer;
+    }
+    #logs {
+      border: 1px solid #ddd;
+      padding: 12px;
+      height: 320px;
+      overflow: auto;
+      white-space: pre-wrap;
+      background: #fafafa;
+      font-size: 14px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+    .muted {
+      color: #666;
+      font-size: 13px;
+    }
+    .row {
+      margin-top: 16px;
+    }
+    strong {
+      font-size: 15px;
+    }
   </style>
 </head>
+
 <body>
-  <h1>DevOps Playground — Debug UI</h1>
-  <div id="meta">
-    <strong>Socket status:</strong> <span id="status">—</span><br/>
-    <strong>Socket id:</strong> <span id="sid">—</span>
+
+  <header>
+    <h1>DevOps Playground — Demo UI</h1>
+    <div class="muted">(Frontend Hosted on GitHub Pages)</div>
+  </header>
+
+  <p class="muted">Backend endpoint: <span id="apiBase"></span></p>
+
+  <div class="row">
+    <button id="healthBtn">Check Health</button>
+    <button id="runBtn">Run Pipeline</button>
+    <span id="lastResp" class="muted"></span>
   </div>
 
-  <button id="run">Run Pipeline</button>
-  <button id="emit">Manual Emit (test)</button>
+  <div class="row">
+    <strong>Last POST Response</strong>
+    <div id="postResp" class="muted">—</div>
+  </div>
 
-  <h3>Logs</h3>
-  <div id="logs">— waiting for logs —</div>
-
-  <h3>Last POST Response</h3>
-  <pre id="lastpost">—</pre>
+  <div class="row">
+    <strong>Logs</strong>
+    <div id="logs">[UI] Ready. Click a button to begin.</div>
+  </div>
 
 <script>
-  // connect to your backend Socket.IO server
-  // transports: prefer websocket, fallback to polling
-  const socket = io("http://localhost:5000", { transports: ['websocket','polling'], timeout: 20000 });
+  // ============================
+  //  SET YOUR BACKEND API HERE
+  // ============================
+  const API_BASE = "http://devops-playground-alb-545525232.eu-central-1.elb.amazonaws.com";
 
-  const statusEl = document.getElementById('status');
-  const sidEl = document.getElementById('sid');
+  document.getElementById('apiBase').textContent = API_BASE;
+
   const logsEl = document.getElementById('logs');
-  const lastpostEl = document.getElementById('lastpost');
+  const postRespEl = document.getElementById('postResp');
+  const lastRespEl = document.getElementById('lastResp');
 
-  // display messages on the page and console
-  function append(msg){
-    const t = new Date().toISOString() + ' ' + msg;
-    if(logsEl.textContent.trim() === '— waiting for logs —') logsEl.textContent = '';
-    logsEl.textContent += t + '\n';
-    logsEl.scrollTop = logsEl.scrollHeight;
-    console.log(t);
+  function appendLog(line){
+    const t = new Date().toISOString() + " " + line;
+    logsEl.textContent = t + "\n" + logsEl.textContent;
   }
 
-  // Socket event handlers
-  socket.on('connect', () => {
-    statusEl.textContent = 'connected';
-    sidEl.textContent = socket.id;
-    append('Socket connected (id=' + socket.id + ')');
-  });
-
-  socket.on('connect_error', (err) => {
-    statusEl.textContent = 'connect_error';
-    append('Socket connect_error: ' + (err && err.message ? err.message : JSON.stringify(err)));
-    console.error('connect_error', err);
-  });
-
-  socket.on('disconnect', (reason) => {
-    statusEl.textContent = 'disconnected';
-    append('Socket disconnected: ' + reason);
-  });
-
-  socket.on('log', (d) => {
-    append('[LOG][' + (d.stage||'?') + '] ' + (d.msg||'') + ' (pid=' + (d.pid||'?') + ')');
-  });
-
-  socket.on('pipeline_done', (d) => {
-    append('[DONE] Pipeline finished: ' + (d.pid||'?'));
-  });
-
-  // Run pipeline button -> POST /api/pipelines/run
-  document.getElementById('run').onclick = async () => {
-    append('[UI] Run button clicked — sending POST /api/pipelines/run');
+  async function checkHealth(){
+    appendLog('[UI] Checking /api/health ...');
     try {
-      const res = await fetch('http://localhost:5000/api/pipelines/run', {
+      const r = await fetch(API_BASE + '/api/health', { method: 'GET' });
+      const text = await r.text();
+      appendLog('[UI] /api/health -> ' + r.status + ' ' + text);
+      lastRespEl.textContent = 'HTTP ' + r.status;
+    } catch(err){
+      appendLog('[ERROR] ' + err);
+      lastRespEl.textContent = 'Error';
+    }
+  }
+
+  async function runPipeline(){
+    appendLog('[UI] Sending POST /api/pipelines/run ...');
+    try {
+      const r = await fetch(API_BASE + '/api/pipelines/run', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       });
-      const text = await res.text();
-      lastpostEl.textContent = `Status: ${res.status}\nBody: ${text}`;
-      append('[UI] POST completed. Status=' + res.status);
-      try { const j = JSON.parse(text); append('[UI] Parsed id=' + (j.id||'none')); } catch(e) { append('[UI] Response not JSON: ' + e.message); }
+      const json = await r.json().catch(()=>null);
+      appendLog('[UI] POST completed. Status=' + r.status +
+                  ' body=' + (json ? JSON.stringify(json) : '—'));
+      postRespEl.textContent = JSON.stringify(json) || r.status;
     } catch(err){
-      append('[UI] POST failed: ' + err.message);
-      console.error('POST error', err);
+      appendLog('[ERROR] ' + err);
+      postRespEl.textContent = 'Error';
     }
-  };
+  }
 
-  // Manual Emit button for quick test via backend endpoint
-  document.getElementById('emit').onclick = async () => {
-    append('[UI] Manual Emit clicked — hitting /api/emit_test');
-    try {
-      const r = await fetch('http://localhost:5000/api/emit_test');
-      const j = await r.json();
-      append('[UI] emit_test response: ' + JSON.stringify(j));
-    } catch(e) {
-      append('[UI] emit_test failed: ' + e.message);
-      console.error('emit_test error', e);
-    }
-  };
+  document.getElementById('healthBtn').addEventListener('click', checkHealth);
+  document.getElementById('runBtn').addEventListener('click', runPipeline);
 </script>
+
 </body>
 </html>
